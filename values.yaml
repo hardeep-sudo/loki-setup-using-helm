@@ -1,0 +1,216 @@
+image:
+  repository: grafana/loki
+  tag: 2.5.0
+  pullPolicy: IfNotPresent
+
+  ## Optionally specify an array of imagePullSecrets.
+  ## Secrets must be manually created in the namespace.
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+  ##
+  # pullSecrets:
+  #   - myRegistryKeySecretName
+
+ingress:
+  enabled: false
+  # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
+  # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
+  # ingressClassName: nginx
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths: []
+  tls: []
+
+affinity: {}
+
+annotations: {}
+
+# enable tracing for debug, need install jaeger and specify right jaeger_agent_host
+tracing:
+  jaegerAgentHost:
+
+config:
+  # existingSecret:
+  auth_enabled: false
+
+  memberlist:
+    join_members:
+      # the value must be defined as string to be evaluated when secret manifest is being generating
+      - '{{ include "loki.fullname" . }}-memberlist'
+
+  ingester:
+    chunk_idle_period: 3m
+    chunk_block_size: 262144
+    chunk_retain_period: 1m
+    max_transfer_retries: 0
+    wal:
+      dir: /data/loki/wal
+    lifecycler:
+      ring:
+        replication_factor: 1
+
+      ## Different ring configs can be used. E.g. Consul
+      # ring:
+      #   store: consul
+      #   replication_factor: 1
+      #   consul:
+      #     host: "consul:8500"
+      #     prefix: ""
+      #     http_client_timeout: "20s"
+      #     consistent_reads: true
+  limits_config:
+    enforce_metric_name: false
+    reject_old_samples: true
+    reject_old_samples_max_age: 168h
+    max_entries_limit_per_query: 5000
+  schema_config:
+    configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+  server:
+    http_listen_port: 3100
+    grpc_listen_port: 9095
+  storage_config:
+    boltdb_shipper:
+      active_index_directory: /data/loki/boltdb-shipper-active
+      cache_location: /data/loki/boltdb-shipper-cache
+      cache_ttl: 24h         # Can be increased for faster performance over longer query periods, uses more disk space
+      shared_store: filesystem
+    filesystem:
+      directory: /data/loki/chunks
+  chunk_store_config:
+    max_look_back_period: 0s
+  table_manager:
+    retention_deletes_enabled: false
+    retention_period: 0s
+  compactor:
+    working_directory: /data/loki/boltdb-shipper-compactor
+    shared_store: filesystem
+
+extraArgs: {}
+
+
+livenessProbe:
+  httpGet:
+    path: /ready
+    port: http-metrics
+  initialDelaySeconds: 45
+
+networkPolicy:
+  enabled: false
+
+
+client: {}
+nodeSelector: {}
+
+persistence:
+  enabled: false
+  accessModes:
+  - ReadWriteOnce
+  size: 10Gi
+  annotations: {}
+
+## Pod Labels
+podLabels: {}
+
+## Pod Annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "http-metrics"
+
+podManagementPolicy: OrderedReady
+
+
+rbac:
+  create: true
+  pspEnabled: true
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http-metrics
+  initialDelaySeconds: 45
+
+replicas: 1
+
+resources: {}
+# limits:
+#   cpu: 200m
+#   memory: 256Mi
+# requests:
+#   cpu: 100m
+#   memory: 128Mi
+
+securityContext:
+  fsGroup: 10001
+  runAsGroup: 10001
+  runAsNonRoot: true
+  runAsUser: 10001
+
+service:
+  type: ClusterIP
+  nodePort:
+  port: 3100
+  annotations: {}
+  labels: {}
+  targetPort: http-metrics
+
+serviceAccount:
+  create: true
+  name:
+  annotations: {}
+  automountServiceAccountToken: true
+
+terminationGracePeriodSeconds: 4800
+
+## Tolerations for pod assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+tolerations: []
+
+# The values to set in the PodDisruptionBudget spec
+# If not set then a PodDisruptionBudget will not be created
+podDisruptionBudget: {}
+# minAvailable: 1
+# maxUnavailable: 1
+
+updateStrategy:
+  type: RollingUpdate
+
+serviceMonitor:
+  enabled: false
+  interval: ""
+  additionalLabels: {}
+  annotations: {}
+  # scrapeTimeout: 10s
+  # path: /metrics
+  prometheusRule:
+    enabled: false
+    additionalLabels: {}
+  #  namespace:
+    rules: []
+
+
+initContainers: []
+
+extraContainers: []
+
+
+extraVolumes: []
+extraVolumeMounts: []
+
+extraPorts: []
+env: []
+
+
+alerting_groups: []
+
+useExistingAlertingGroup:
+  enabled: false
+  configmapName: ""
